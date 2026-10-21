@@ -43,3 +43,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.*
+
+data/raw/
+data/processed/
+*.zip

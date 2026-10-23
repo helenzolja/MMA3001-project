@@ -1,4 +1,18 @@
 """Tests for mma3001_project.reconstruction (run with: python -m pytest)."""
+from mma3001_project.reconstruction import (
+    METHODS,
+    bootstrap_rmse,
+    divided_differences,
+    error_metrics,
+    evaluate_methods,
+    fill_gaps,
+    find_gaps,
+    is_occupied_hours,
+    newton_evaluate,
+    reconstruct_frame,
+    sample_gap_starts,
+    summarise_errors,
+)
 import numpy as np
 import pandas as pd
 import pytest
@@ -96,3 +110,42 @@ def test_error_metrics():
     assert m["MAE"] == pytest.approx(2.0)
     assert m["bias"] == pytest.approx(-2 / 3)
     assert m["RMSE"] == pytest.approx(np.sqrt(20 / 3))
+
+
+
+def test_gap_starts_have_real_readings_either_side():
+    values = 400 + np.arange(100.0)
+    values[[10, 11, 50]] = np.nan                      # genuinely missing
+    s = make_series(values)
+    rng = np.random.default_rng(0)
+    starts = sample_gap_starts(s, 3, 30, rng)
+    ok = s.notna().to_numpy()
+    assert ok[starts - 1].all() and ok[starts + 3].all()
+
+
+def test_gap_starts_reproducible_with_seed():
+    s = make_series(400 + np.arange(100.0))
+    a = sample_gap_starts(s, 5, 10, np.random.default_rng(42))
+    b = sample_gap_starts(s, 5, 10, np.random.default_rng(42))
+    assert np.array_equal(a, b)
+
+
+def test_linear_has_zero_error_on_a_straight_line():
+    s = make_series(400 + 2 * np.arange(300.0))
+    errors = evaluate_methods(s, [1, 6], n_gaps=10, methods=("linear", "locf"))
+    table = summarise_errors(errors)
+    assert table.loc[("linear", 6), "RMSE"] < 1e-9
+    assert table.loc[("locf", 6), "RMSE"] > 1                # LOCF lags a trend
+
+
+def test_bootstrap_interval_contains_estimate():
+    errors = pd.DataFrame({"gap_id": np.repeat(np.arange(50), 3),
+                           "error": np.random.default_rng(1).normal(0, 10, 150)})
+    rmse, lo, hi = bootstrap_rmse(errors, n_boot=500)
+    assert lo <= rmse <= hi
+
+
+def test_occupied_hours():
+    # Monday 10:00 and Saturday 10:00 in Melbourne (UTC+10 in June)
+    index = pd.DatetimeIndex(["2024-06-03 00:00", "2024-06-08 00:00"], tz="UTC")
+    assert is_occupied_hours(index).tolist() == [True, False]

@@ -240,3 +240,169 @@ def error_metrics(truth, prediction):
         "bias": float(np.mean(err)),
         "n": int(err.size),
     }
+
+
+# ---------------------------------------------------------------------------
+# Validation: hide real readings, reconstruct them, compare with the truth.
+# ---------------------------------------------------------------------------
+
+def sample_gap_starts(series, length, n, rng, min_obs=0.75):
+    """Choose random start positions for synthetic (artificial) gaps.
+
+    A start position ``s`` is allowed only if the readings just before
+    (``s-1``) and just after (``s+length``) the gap are observed, and at least
+    ``min_obs`` of the hidden readings are observed, so there is real data to
+    score against. (Sensor 869 misses about one reading in twelve, so long
+    fully observed stretches are rare.)
+
+    Parameters
+    ----------
+    series : pandas.Series
+        Regularly spaced series; ``NaN`` marks a genuinely missing reading.
+    length : int
+        Gap length in slots (1 slot = 10 minutes).
+    n : int
+        Number of gaps to choose.
+    rng : numpy.random.Generator
+        Seeded random generator, so results are reproducible.
+    min_obs : float, default 0.75
+        Minimum fraction of the hidden slots that must hold a real reading.
+
+    Returns
+    -------
+    numpy.ndarray
+        Integer start positions (without repeats when enough are available).
+
+    Raises
+    ------
+    ValueError
+        If no allowed start position exists.
+    """
+    ok = series.notna().to_numpy()
+    n_slots = len(ok)
+    counts = np.concatenate(([0], np.cumsum(ok)))     # running count of readings
+    s = np.arange(1, n_slots - length)                # needs s-1 and s+length
+    n_obs = counts[s + length] - counts[s]            # readings inside each gap
+    keep = (n_obs >= np.ceil(min_obs * length)) & ok[s - 1] & ok[s + length]
+    starts = s[keep]
+    if len(starts) == 0:
+        raise ValueError(f"no allowed start positions for a gap of {length} slots")
+    return rng.choice(starts, size=n, replace=len(starts) < n)
+
+
+def is_occupied_hours(index, tz="Australia/Melbourne"):
+    """True for weekday 08:00-18:00 local time (when CO2 changes fastest)."""
+    local = index.tz_convert(tz)
+    return np.asarray((local.dayofweek < 5) & (local.hour >= 8) & (local.hour < 18))
+
+
+def evaluate_methods(series, lengths, n_gaps=200, seed=0, methods=METHODS,
+                     window=72, min_obs=0.75):
+    """Hide real readings, reconstruct them with each method, record the errors.
+
+    For every gap length, ``n_gaps`` artificial gaps are placed at random.
+    Each method fills the gap from the surrounding ``window`` slots on each
+    side, and the error (filled - true) is recorded at every hidden slot that
+    held a real reading.
+
+    Parameters
+    ----------
+    series : pandas.Series
+        Regularly spaced series with a DatetimeIndex.
+    lengths : list of int
+        Gap lengths to test, in slots (1 slot = 10 minutes).
+    n_gaps : int, default 200
+        Number of artificial gaps per length.
+    seed : int, default 0
+        Random seed (fixed, so the experiment is reproducible).
+    methods : sequence of str, default METHODS
+        Methods passed to :func:`fill_gaps`.
+    window : int, default 72
+        Slots of context kept on each side of a gap (72 = 12 hours).
+    min_obs : float, default 0.75
+        Passed to :func:`sample_gap_starts`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per (method, hidden reading) with columns ``method``,
+        ``length``, ``gap_id``, ``time``, ``occupied`` and ``error`` [ppm].
+    """
+    rng = np.random.default_rng(seed)
+    values = series.to_numpy(dtype=float)
+    occupied = is_occupied_hours(series.index)
+    rows = []
+    gap_id = 0
+    for length in lengths:
+        for s in sample_gap_starts(series, length, n_gaps, rng, min_obs):
+            lo = max(0, s - window)
+            hi = min(len(series), s + length + window)
+            local = series.iloc[lo:hi].copy()
+            local.iloc[s - lo:s - lo + length] = np.nan       # hide the readings
+            truth = values[s:s + length]
+            scored = np.isfinite(truth)                       # real readings only
+            for m in methods:
+                pred = fill_gaps(local, method=m).to_numpy()[s - lo:s - lo + length]
+                for k in np.flatnonzero(scored):
+                    rows.append((m, length, gap_id, series.index[s + k],
+                                 occupied[s + k], pred[k] - truth[k]))
+            gap_id += 1
+    return pd.DataFrame(rows, columns=["method", "length", "gap_id", "time",
+                                       "occupied", "error"])
+
+
+def summarise_errors(errors, by=("method", "length")):
+    """Pooled RMSE, MAE and bias for each group of an :func:`evaluate_methods` table.
+
+    Parameters
+    ----------
+    errors : pandas.DataFrame
+        Output of :func:`evaluate_methods`.
+    by : sequence of str, default ("method", "length")
+        Columns to group by.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``RMSE``, ``MAE``, ``bias`` [ppm] and ``n`` for each group.
+    """
+    g = errors.groupby(list(by))["error"]
+    return pd.DataFrame({
+        "RMSE": np.sqrt(g.apply(lambda e: np.mean(e ** 2))),
+        "MAE": g.apply(lambda e: np.mean(np.abs(e))),
+        "bias": g.mean(),
+        "n": g.size(),
+    })
+
+
+def bootstrap_rmse(errors, n_boot=2000, seed=0, level=0.95):
+    """Bootstrap confidence interval for a pooled RMSE, resampling whole gaps.
+
+    Readings inside one gap are not independent, so whole gaps (not single
+    readings) are resampled with replacement (Week 5.5.11).
+
+    Parameters
+    ----------
+    errors : pandas.DataFrame
+        Rows of :func:`evaluate_methods` for ONE method (and usually one length).
+    n_boot : int, default 2000
+        Number of bootstrap resamples.
+    seed : int, default 0
+        Random seed.
+    level : float, default 0.95
+        Confidence level.
+
+    Returns
+    -------
+    tuple of float
+        (RMSE, lower bound, upper bound) in ppm.
+    """
+    per_gap = errors.groupby("gap_id")["error"].agg(
+        sse=lambda e: np.sum(e ** 2), n="size")
+    sse, n = per_gap["sse"].to_numpy(), per_gap["n"].to_numpy()
+    rng = np.random.default_rng(seed)
+    pick = rng.integers(0, len(sse), size=(n_boot, len(sse)))
+    boot = np.sqrt(sse[pick].sum(axis=1) / n[pick].sum(axis=1))
+    alpha = (1 - level) / 2
+    return (float(np.sqrt(sse.sum() / n.sum())),
+            float(np.quantile(boot, alpha)), float(np.quantile(boot, 1 - alpha)))

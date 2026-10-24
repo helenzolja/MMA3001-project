@@ -1,6 +1,6 @@
-# Smarter HVAC scheduling from indoor sensor data
+# Smarter HVAC scheduling from indoor sensor data for energy conservation
 
-MMA3001 individual project. Cleans Monash Smart Infrastructure environmental sensor
+Project created for MMA3001 cleans Monash Smart Infrastructure environmental sensor
 data, reconstructs missing readings, identifies the daily HVAC and occupancy patterns,
 and proposes an HVAC on/off schedule that uses less energy while keeping occupied
 hours comfortable.

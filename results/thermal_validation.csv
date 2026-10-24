@@ -1,0 +1,3 @@
+model,test days,first-order RMSE [°C],no-change RMSE [°C]
+warm-up,13,0.5857212605790287,2.881834557048902
+cool-down,13,0.647592157971083,1.8339484201064598

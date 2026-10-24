@@ -45,7 +45,6 @@ Thumbs.db
 .env.*
 
 data/raw/
-data/processed/
 *.zip
 .venv/
 *.egg-info/

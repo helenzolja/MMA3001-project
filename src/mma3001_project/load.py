@@ -34,18 +34,13 @@ MIN_UNIQUE_RATIO = 0.1
 REQUIRED_COLUMNS = {"sensorid", "jsondata", "createdate"}
 
 
-def parse_env_csv(path: str | Path, dedupe_payloads: bool = True) -> pd.DataFrame:
+def parse_env_csv(path: str | Path) -> pd.DataFrame:
     """Flatten the raw environmental CSV into one row per reading.
 
     Parameters
     ----------
     path : str or Path
         Path to the raw export (e.g. ``5EnvSensor_MayToDec2024_180kRows.csv``).
-    dedupe_payloads : bool, default True
-        Parse each distinct (sensor, payload) pair only once. Gateways re-send
-        identical payloads, so this skips most ``json.loads`` calls without
-        changing the result. ``False`` parses every row (slower
-        baseline).
 
     Returns
     -------
@@ -75,8 +70,8 @@ def parse_env_csv(path: str | Path, dedupe_payloads: bool = True) -> pd.DataFram
         raise ValueError(f"Missing required columns: {sorted(missing)}")
 
     upload_counts = raw["sensorid"].value_counts().to_dict()
-    if dedupe_payloads:
-        raw = raw.drop_duplicates(["sensorid", "jsondata"])
+        # Gateways re-send identical payloads; parse each one only once.
+    raw = raw.drop_duplicates(["sensorid", "jsondata"])
 
     records = []
     for sensor_id, payload in zip(raw["sensorid"], raw["jsondata"]):

@@ -73,7 +73,7 @@ def time_to_reach(y0, target, y_inf, tau):
         If the target is never reached (not between y0 and y_inf).
     """
     ratio = (y0 - y_inf) / (target - y_inf)
-    if not ratio >= 1:
+    if not ratio >= 1:   # target not between y0 and y_inf: never reached
         raise ValueError("target must lie between y0 and y_inf")
     return float(tau * np.log(ratio))
 
@@ -149,9 +149,9 @@ def fit_first_order(t, y, guess, tau_bounds=(0.05, 24.0)):
     t = np.asarray(t, dtype=float)
     y = np.asarray(y, dtype=float)
     result = least_squares(
-        lambda p: first_order_response(t, p[0], p[1], y[0]) - y,
+        lambda p: first_order_response(t, p[0], p[1], y[0]) - y,   # residuals; y0 fixed, fit y_inf and tau
         x0=guess,
-        bounds=([-np.inf, tau_bounds[0]], [np.inf, tau_bounds[1]]),
+        bounds=([-np.inf, tau_bounds[0]], [np.inf, tau_bounds[1]]),   # keep tau positive and plausible
     )
     y_inf, tau = result.x
     return {
@@ -206,5 +206,5 @@ def prediction_errors(segments, y_inf, tau):
     model, baseline = [], []
     for _, t, y in segments:
         model.append(first_order_response(t, y_inf, tau, y[0]) - y)
-        baseline.append(y[0] - y)
+        baseline.append(y[0] - y)   # "no change": stays at the first reading
     return np.concatenate(model), np.concatenate(baseline)

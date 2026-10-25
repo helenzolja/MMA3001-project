@@ -51,9 +51,9 @@ def rate_of_change(series, window=7, polyorder=2):
     """
     if series.isna().any():
         raise ValueError("series contains NaN; reconstruct the gaps first")
-    step_hours = (series.index[1] - series.index[0]).total_seconds() / 3600.0
+    step_hours = (series.index[1] - series.index[0]).total_seconds() / 3600.0   # so the rate comes out per hour
     rate = savgol_filter(series.to_numpy(dtype=float), window, polyorder,
-                         deriv=1, delta=step_hours)
+                         deriv=1, delta=step_hours)   # deriv=1: slope of the fitted quadratic
     return pd.Series(rate, index=series.index, name=f"d_{series.name}_dt")
 
 
@@ -102,7 +102,7 @@ def daily_event(rate, start_hour, end_hour, kind="max", min_rate=0.0, tz=LOCAL_T
     for date, group in table.groupby("day"):
         i = group["rate"].idxmax() if kind == "max" else group["rate"].idxmin()
         value = group.loc[i, "rate"]
-        found = abs(value) >= min_rate
+        found = abs(value) >= min_rate   # too slow a change = no event that day
         rows.append((date,
                      group.loc[i, "time"] if found else pd.NaT,
                      group.loc[i, "hour"] if found else np.nan,

@@ -1,5 +1,0 @@
-[33mc589bc1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #5 from helenzolja/trim
-[33m7da470d[m[33m ([m[1;31morigin/trim[m[33m, [m[1;32mtrim[m[33m)[m Trim notebooks; add thermal model notebook
-[33m00be5b9[m Merge pull request #4 from helenzolja/patterns
-[33m61d8f60[m[33m ([m[1;31morigin/patterns[m[33m, [m[1;32mthermal[m[33m, [m[1;32mpatterns[m[33m)[m Detect HVAC schedule and occupancy from rates of change; decision-tree check
-[33m770a252[m Merge pull request #3 from helenzolja/reconstruction

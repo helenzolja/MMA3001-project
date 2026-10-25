@@ -7,7 +7,6 @@ from mma3001_project.patterns import (
     daily_event,
     daily_profile,
     rate_of_change,
-    time_features,
 )
 
 
@@ -58,10 +57,9 @@ def test_quiet_day_has_no_event():
     assert on["time"].isna().all()
 
 
-def test_time_features_and_profile():
-    s = make_series(np.arange(144 * 7, dtype=float))      # one week from Monday
-    f = time_features(s.index)
-    assert f["hour"].iloc[0] == 0 and f["weekend"].sum() == 2 * 144
+def test_daily_profile_splits_weekdays_and_weekends():
+    s = make_series(np.r_[np.zeros(5 * 144), np.ones(2 * 144)])   # Mon-Fri 0, Sat-Sun 1
     profile = daily_profile(s)
     assert profile.shape == (144, 2)
     assert list(profile.columns) == ["weekday", "weekend"]
+    assert (profile["weekday"] == 0).all() and (profile["weekend"] == 1).all()

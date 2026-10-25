@@ -112,29 +112,6 @@ def daily_event(rate, start_hour, end_hour, kind="max", min_rate=0.0, tz=LOCAL_T
     return out
 
 
-def time_features(index, tz=LOCAL_TZ):
-    """Hour-of-day and weekend features for the decision-tree check (Week 5.2).
-
-    Parameters
-    ----------
-    index : pandas.DatetimeIndex
-        Time-zone-aware timestamps.
-    tz : str, default "Australia/Melbourne"
-        Local time zone.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Columns ``hour`` (decimal local hour, 0-24) and ``weekend``
-        (1 on Saturday/Sunday, else 0), with the original index.
-    """
-    local = index.tz_convert(tz)
-    return pd.DataFrame({
-        "hour": local.hour + local.minute / 60.0,
-        "weekend": (local.dayofweek >= 5).astype(int),
-    }, index=index)
-
-
 def daily_profile(series, tz=LOCAL_TZ):
     """Average day: mean value at each time of day, weekdays vs weekends.
 
@@ -151,8 +128,11 @@ def daily_profile(series, tz=LOCAL_TZ):
         Index = decimal local hour (0, 1/6, ..., 23 5/6); columns
         ``weekday`` and ``weekend`` holding the mean value at that time.
     """
-    f = time_features(series.index, tz)
-    table = pd.DataFrame({"value": series.to_numpy(), "hour": f["hour"].round(4),
-                          "day_type": np.where(f["weekend"] == 1, "weekend", "weekday")})
+    local = series.index.tz_convert(tz)
+    table = pd.DataFrame({
+        "value": series.to_numpy(),
+        "hour": np.round(local.hour + local.minute / 60.0, 4),
+        "day_type": np.where(local.dayofweek >= 5, "weekend", "weekday"),
+    })
     return table.pivot_table(index="hour", columns="day_type", values="value",
                              aggfunc="mean")

@@ -2,6 +2,8 @@
 comfort_c,22.5
 warm_up_h,0.48557451133947854
 hold_h,2.018673766279762
+night_low_c,21.0
+switch_off_c,23.5
 warm_T_inf,24.196473356932685
 warm_tau_h,0.7664990913504675
 cool_T_inf,21.033643024638998

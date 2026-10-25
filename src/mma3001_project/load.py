@@ -112,6 +112,7 @@ def sensor_summary(long: pd.DataFrame) -> pd.DataFrame:
         a boolean ``is_live`` (ratio >= :data:`MIN_UNIQUE_RATIO`).
     """
     uploads = long.attrs.get("n_upload_rows", {})
+    # Count on one variable (CO2) so each measurement time is counted once, not per variable.
     co2 = long[long["variable"] == "Carbon dioxide"]
     out = co2.groupby("sensorid").agg(
         n_readings=("time_utc", "nunique"),
@@ -184,6 +185,8 @@ def load_sensor_series(
     if valid_range is not None:
         lo, hi = valid_range
         s = s.where((s >= lo) & (s <= hi))
+    # Measurement times are irregular; binning puts them on a fixed grid so an
+    # empty bin becomes an explicit NaN gap for reconstruction.
     grid = s.resample(freq).mean()
     grid.name = variable
     return grid
@@ -246,6 +249,11 @@ def clean_sensor_frame(
 
 def cleaning_report(frame: pd.DataFrame) -> pd.DataFrame:
     """Per-column data-quality summary of a cleaned frame.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        Output of :func:`clean_sensor_frame` (regular grid, NaN = missing).
 
     Returns
     -------

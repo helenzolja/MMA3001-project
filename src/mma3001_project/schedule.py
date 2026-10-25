@@ -140,6 +140,7 @@ def occupied_mask(index, start_hours, end_hours, tz=LOCAL_TZ):
     Returns
     -------
     numpy.ndarray of bool
+        One entry per timestamp; True where start <= local hour < end.
     """
     hour, day, _ = _local_hour_and_day(index, tz)
     start = start_hours.reindex(day).to_numpy()
@@ -175,9 +176,9 @@ def schedule_metrics(on, T, occupied, comfort, unheated, step_h=STEP_H):
         ``occupied_below_comfort_pct``: % of occupied steps below ``comfort``.
     """
     on, T, occupied = np.asarray(on, bool), np.asarray(T, float), np.asarray(occupied, bool)
-    weeks = len(T) * step_h / (24 * 7)
+    weeks = len(T) * step_h / (24 * 7)                 # normalise so periods compare
     t = np.arange(len(T)) * step_h
-    excess = np.maximum(T - unheated, 0.0)
+    excess = np.maximum(T - unheated, 0.0)             # only heat held above free-running level
     return {
         "run_h_per_week": on.sum() * step_h / weeks,
         "degree_h_per_week": trapezoid(excess, t) / weeks,

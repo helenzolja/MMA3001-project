@@ -174,6 +174,7 @@ def evaluate_methods(series, lengths, n_gaps=200, seed=0, methods=METHODS, windo
     gap_id = 0
     for length in lengths:
         for s in sample_gap_starts(series, length, n_gaps, rng):
+            # Local window keeps each fill O(window), not O(series); see 07_performance.
             lo, hi = max(0, s - window), min(len(series), s + length + window)
             local = series.iloc[lo:hi].copy()
             local.iloc[s - lo:s - lo + length] = np.nan       # hide the readings
@@ -232,11 +233,12 @@ def bootstrap_rmse(errors, n_boot=2000, seed=0, level=0.95):
     tuple of float
         (RMSE, lower bound, upper bound).
     """
+    # Reduce each gap to (sum of squared errors, count) so a resample is a cheap sum.
     per_gap = errors.groupby("gap_id")["error"].agg(
         sse=lambda e: np.sum(e ** 2), n="size")
     sse, n = per_gap["sse"].to_numpy(), per_gap["n"].to_numpy()
     rng = np.random.default_rng(seed)
-    pick = rng.integers(0, len(sse), size=(n_boot, len(sse)))
+    pick = rng.integers(0, len(sse), size=(n_boot, len(sse)))   # gap indices per resample
     boot = np.sqrt(sse[pick].sum(axis=1) / n[pick].sum(axis=1))
     alpha = (1 - level) / 2
     return (float(np.sqrt(sse.sum() / n.sum())), float(np.quantile(boot, alpha)), float(np.quantile(boot, 1 - alpha)))

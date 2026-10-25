@@ -16,18 +16,18 @@ schedules.
 | **Inputs** | Raw sensor export (CSV): sensor ID, upload time and a JSON payload of readings. Variables used: CO2 (ppm), temperature (°C), humidity (% RH), every ~10 min |
 | **Outputs** | Gap-free readings with reconstruction flags; daily HVAC on/off, arrival and departure times; warm-up and cool-down time constants τ (h); proposed schedule with weekly run-hours, heated degree-hours (°C·h) and % of occupied time below comfort |
 | **Model** | Room temperature follows `dT/dt = (T_inf - T) / tau`, with `T_inf` and `tau` fitted separately for HVAC on (warm-up) and off (cool-down) |
-| **Supplied data** | 5 sensors, May–Dec 2024 export (180k rows); one sensor (6012002000869) is live from 29 Feb to 13 Jun 2024 |
+| **Supplied data** | 5 sensors, May–Dec 2024 export (180k rows); sensor 6012002000869 (Building 60, room G.38) is live from 29 Feb to 13 Jun 2024 |
 | **Not supplied** | HVAC timer settings, occupancy, set-point and energy use; these are inferred from the data (switch times from temperature, occupancy from CO2) |
 
-Main result: switching the HVAC on 08:00–19:20 on weekdays and off at weekends cuts
-run-hours by 52% and heated degree-hours by 48%, with 0.9% of occupied time below
+Main result: switching the HVAC on 08:00–19:10 on weekdays and off at weekends cuts
+run-hours by 53% and heated degree-hours by 48%, with 0.9% of occupied time below
 22.5 °C (`results/schedule_comparison.csv`).
 
-Invalid inputs are handled as follows. A missing file or columns raises `FileNotFoundError` or `ValueError`. Readings
-flagged with a sensor `errorCode` are dropped. Values outside physical ranges (CO2
-350–5000 ppm, 5–40 °C, 0–100 % RH) are set to missing. Frozen sensors are rejected with
-`ValueError`. Missing slots are filled only between observed readings (never
-extrapolated) and flagged.
+Invalid inputs are handled as follows. A missing file or columns raises `FileNotFoundError`
+or `ValueError`. Readings flagged with a sensor `errorCode` are dropped. Values outside
+physical ranges (CO2 350–5000 ppm, 5–40 °C, 0–100 % RH) are set to missing. Frozen sensors
+are rejected with `ValueError`. Missing slots are filled only between observed readings
+(never extrapolated) and flagged.
 
 ## Repository layout
 
@@ -47,17 +47,22 @@ notebooks/
   06_schedule         current vs proposed schedule, sensitivity
   07_performance      timing and profiling, baseline vs improved
 tests/                pytest suite
+data/processed/       cleaned and reconstructed data for sensor 869
 results/              output tables written by the notebooks
+figures/              report figures written by the notebooks
 docs/                 HTML documentation (pdoc)
 reports/              pytest report
 ```
 
 ## Setup
 
+Requires Python 3.10 or later.
+
 ```
 python -m venv .venv
-.venv\Scripts\Activate.ps1          # Windows PowerShell
-pip install -e .
+.venv\Scripts\Activate.ps1          # Windows PowerShell (macOS/Linux: source .venv/bin/activate)
+pip install -e .                    # the package and its dependencies (NumPy, pandas, SciPy, Matplotlib)
+pip install -r requirements.txt     # Jupyter, pytest, pytest-html and pdoc
 ```
 
 ## Data
@@ -65,7 +70,10 @@ pip install -e .
 The raw file `5EnvSensor_MayToDec2024_180kRows.csv` (350 MB) is environmental sensor
 data supplied through Monash Smart Infrastructure. It is not stored in this repository
 because of its size and is not covered by this repository's MIT licence. Place it in
-`data/raw/` to run the notebooks.
+`data/raw/` to run notebooks 01 and 07.
+
+The cleaned and reconstructed data for sensor 6012002000869 are included in
+`data/processed/`, so notebooks 02–06 can be run without the raw file.
 
 ## Run
 
